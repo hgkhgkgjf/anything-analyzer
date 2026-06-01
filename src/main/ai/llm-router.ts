@@ -454,6 +454,9 @@ export class LLMRouter {
       }, 1, false, signal);
 
       const data = await this.safeParseJson<{
+        status?: string;
+        incomplete_details?: ResponsesIncompleteDetails;
+        error?: { message?: string };
         output: Array<{
           type: string;
           id?: string;
@@ -468,6 +471,12 @@ export class LLMRouter {
       totalPromptTokens += data.usage?.input_tokens || 0;
       totalCompletionTokens += data.usage?.output_tokens || 0;
 
+      if (data.status === "incomplete") {
+        throw new Error(`Responses API incomplete: ${data.incomplete_details?.reason || "unknown"}`);
+      }
+      if (data.status === "failed") {
+        throw new Error(`Responses API failed: ${data.error?.message || "unknown"}`);
+      }
       if (!Array.isArray(data.output)) {
         throw new Error(`LLM 响应格式异常: 缺少 output 字段 — ${JSON.stringify(data).slice(0, 200)}`);
       }

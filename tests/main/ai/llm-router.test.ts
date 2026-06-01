@@ -374,6 +374,48 @@ describe("LLMRouter", () => {
     });
   });
 
+  describe("completeWithTools - Responses API", () => {
+    it("should reject failed Responses API tool rounds explicitly", async () => {
+      const config: LLMProviderConfig = { ...baseConfig, apiType: "responses" };
+      fetchSpy.mockResolvedValueOnce(
+        createJSONResponse({
+          status: "failed",
+          error: { message: "tool planning failed" },
+        }),
+      );
+
+      const router = new LLMRouter(config);
+
+      await expect(
+        router.completeWithTools(
+          [{ role: "user", content: "test" }],
+          [],
+          async () => "unused",
+        ),
+      ).rejects.toThrow("Responses API failed: tool planning failed");
+    });
+
+    it("should reject incomplete Responses API tool rounds explicitly", async () => {
+      const config: LLMProviderConfig = { ...baseConfig, apiType: "responses" };
+      fetchSpy.mockResolvedValueOnce(
+        createJSONResponse({
+          status: "incomplete",
+          incomplete_details: { reason: "max_output_tokens" },
+        }),
+      );
+
+      const router = new LLMRouter(config);
+
+      await expect(
+        router.completeWithTools(
+          [{ role: "user", content: "test" }],
+          [],
+          async () => "unused",
+        ),
+      ).rejects.toThrow("Responses API incomplete: max_output_tokens");
+    });
+  });
+
   describe("completeResponses - streaming", () => {
     it("should parse SSE events with event: prefix and call onChunk", async () => {
       const config: LLMProviderConfig = { ...baseConfig, apiType: "responses" };
