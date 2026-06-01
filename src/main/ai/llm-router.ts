@@ -559,6 +559,9 @@ export class LLMRouter {
       choices: Array<{ message: { content: string } }>;
       usage?: { prompt_tokens: number; completion_tokens: number };
     }>(response);
+    if (!Array.isArray(data.choices) || data.choices.length === 0) {
+      throw new Error(`LLM 响应格式异常: 缺少 choices 字段 — ${JSON.stringify(data).slice(0, 200)}`);
+    }
     return {
       content: data.choices[0]?.message?.content || "",
       promptTokens: data.usage?.prompt_tokens || 0,
