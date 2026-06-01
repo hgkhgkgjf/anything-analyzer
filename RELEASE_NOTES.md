@@ -1,16 +1,16 @@
-# Anything Analyzer v3.6.16
+# Anything Analyzer v3.6.17
 
 ## 修复
 
-- **Anthropic/MiniMax 流式末尾事件不再丢失** — 修复 Anthropic SSE 响应没有尾随换行时最后一行 `data:` 未被解析，导致末尾文本块被忽略的问题
-  - 在流结束后补处理剩余 buffer，与 OpenAI/Responses 流式解析保持一致
-  - 增加无尾随换行 SSE 回归测试，确保最后文本块会进入增量回调和最终内容
+- **OpenAI Chat 流式错误不再被吞掉** — 修复 Chat Completions SSE 返回 `error` payload 时被当成空成功响应的问题
+  - 将流式 JSON 容错解析与 API 错误判断拆开，保留 malformed chunk 跳过逻辑
+  - 增加错误 payload 回归测试，确保限流、鉴权等流式错误会抛给调用方
 
 ## 下载
 
 | 平台 | 文件 |
 |------|------|
-| Windows | Anything-Analyzer-Setup-3.6.16.exe |
-| macOS (Apple Silicon) | Anything-Analyzer-3.6.16-arm64.dmg |
-| macOS (Intel) | Anything-Analyzer-3.6.16-x64.dmg |
-| Linux | Anything-Analyzer-3.6.16.AppImage |
+| Windows | Anything-Analyzer-Setup-3.6.17.exe |
+| macOS (Apple Silicon) | Anything-Analyzer-3.6.17-arm64.dmg |
+| macOS (Intel) | Anything-Analyzer-3.6.17-x64.dmg |
+| Linux | Anything-Analyzer-3.6.17.AppImage |

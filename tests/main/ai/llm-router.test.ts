@@ -365,6 +365,22 @@ describe("LLMRouter", () => {
       expect(chunks).toEqual(["final chat chunk"]);
       expect(result.content).toBe("final chat chunk");
     });
+
+    it("should reject when OpenAI chat stream emits an error payload", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        createSSEResponse([
+          {
+            data: '{"error":{"message":"quota exceeded"}}',
+          },
+        ]),
+      );
+
+      const router = new LLMRouter(baseConfig);
+
+      await expect(
+        router.complete([{ role: "user", content: "test" }], () => {}),
+      ).rejects.toThrow("OpenAI stream error: quota exceeded");
+    });
   });
 
   describe("completeAnthropic - streaming", () => {

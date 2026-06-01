@@ -635,19 +635,25 @@ export class LLMRouter {
       if (!trimmed || !trimmed.startsWith("data: ")) return;
       const data = trimmed.slice(6);
       if (data === "[DONE]") return;
+      let parsed: any;
       try {
-        const parsed = JSON.parse(data) as any;
-        const chunk = parsed.choices?.[0]?.delta?.content || "";
-        if (chunk) {
-          fullContent += chunk;
-          onChunk(chunk);
-        }
-        if (parsed.usage) {
-          promptTokens = parsed.usage.prompt_tokens;
-          completionTokens = parsed.usage.completion_tokens;
-        }
+        parsed = JSON.parse(data) as any;
       } catch {
-        /* skip */
+        /* skip malformed JSON */
+        return;
+      }
+      if (parsed.error) {
+        const errorMsg = parsed.error.message || "Unknown stream error";
+        throw new Error(`OpenAI stream error: ${errorMsg}`);
+      }
+      const chunk = parsed.choices?.[0]?.delta?.content || "";
+      if (chunk) {
+        fullContent += chunk;
+        onChunk(chunk);
+      }
+      if (parsed.usage) {
+        promptTokens = parsed.usage.prompt_tokens;
+        completionTokens = parsed.usage.completion_tokens;
       }
     };
 
