@@ -90,6 +90,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function readToolArguments(argumentsJson: string, fieldName: string): Record<string, unknown> {
+  try {
+    const args = JSON.parse(argumentsJson || "{}");
+    if (isRecord(args)) return args;
+  } catch {
+    // Fall through to the common protocol error below.
+  }
+  throw new Error(`${fieldName} arguments must be a valid JSON object`);
+}
+
 function parseStreamJson<T>(data: string, providerName: string): T {
   try {
     return JSON.parse(data) as T;
@@ -353,9 +363,9 @@ export class LLMRouter {
           if (!tc.id) throw new Error("tool_call missing id");
           if (!tc.function?.name) throw new Error("tool_call missing name");
           if (typeof tc.function?.arguments !== "string") throw new Error("tool_call arguments must be a string");
+          const args = readToolArguments(tc.function.arguments, "tool_call");
           let result: string;
           try {
-            const args = JSON.parse(tc.function.arguments);
             result = await callTool(tc.function.name, args);
           } catch (err) {
             result = `Error: ${err instanceof Error ? err.message : String(err)}`;
@@ -586,8 +596,8 @@ export class LLMRouter {
           if (!fc.call_id) throw new Error("function_call missing call_id");
           if (!fc.name) throw new Error("function_call missing name");
           if (typeof fc.arguments !== "string") throw new Error("function_call arguments must be a string");
+          const args = readToolArguments(fc.arguments, "function_call");
           try {
-            const args = JSON.parse(fc.arguments || "{}");
             result = await callTool(fc.name, args);
           } catch (err) {
             result = `Error: ${err instanceof Error ? err.message : String(err)}`;
