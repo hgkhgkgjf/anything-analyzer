@@ -94,6 +94,17 @@ function parseStreamJson<T>(data: string, providerName: string): T {
   }
 }
 
+function readStreamTextDelta(
+  value: unknown,
+  providerName: string,
+  fieldName: string,
+  required = false,
+): string {
+  if (typeof value === "string") return value;
+  if (!required && value == null) return "";
+  throw new Error(`${providerName} stream error: ${fieldName} must be a string`);
+}
+
 /**
  * Sanitize string content in LLM request body to remove control characters
  * that may break JSON parsing in intermediate proxies.
@@ -754,7 +765,7 @@ export class LLMRouter {
         const errorMsg = parsed.error.message || "Unknown stream error";
         throw new Error(`OpenAI stream error: ${errorMsg}`);
       }
-      const chunk = parsed.choices?.[0]?.delta?.content || "";
+      const chunk = readStreamTextDelta(parsed.choices?.[0]?.delta?.content, "OpenAI", "delta.content");
       if (chunk) {
         fullContent += chunk;
         onChunk(chunk);
@@ -801,9 +812,12 @@ export class LLMRouter {
       }
       if (!trimmed.startsWith("data: ")) return;
       const parsed = parseStreamJson<any>(trimmed.slice(6), "Responses API");
-      if (currentEvent === "response.output_text.delta" && parsed.delta) {
-        fullContent += parsed.delta;
-        onChunk(parsed.delta);
+      if (currentEvent === "response.output_text.delta") {
+        const delta = readStreamTextDelta(parsed.delta, "Responses API", "delta", true);
+        if (delta) {
+          fullContent += delta;
+          onChunk(delta);
+        }
       }
       if (currentEvent === "response.completed" && parsed.response?.usage) {
         promptTokens = parsed.response.usage.input_tokens || 0;
@@ -854,9 +868,12 @@ export class LLMRouter {
         const errorMsg = parsed.error?.message || "Unknown stream error";
         throw new Error(`Anthropic stream error: ${errorMsg}`);
       }
-      if (parsed.type === "content_block_delta" && parsed.delta?.text) {
-        fullContent += parsed.delta.text;
-        onChunk(parsed.delta.text);
+      if (parsed.type === "content_block_delta") {
+        const delta = readStreamTextDelta(parsed.delta?.text, "Anthropic", "delta.text");
+        if (delta) {
+          fullContent += delta;
+          onChunk(delta);
+        }
       }
       if (parsed.type === "message_start" && parsed.message?.usage)
         promptTokens = parsed.message.usage.input_tokens;

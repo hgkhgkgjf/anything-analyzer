@@ -707,6 +707,24 @@ describe("LLMRouter", () => {
         router.complete([{ role: "user", content: "test" }], () => {}),
       ).rejects.toThrow("Responses API stream error: malformed JSON payload");
     });
+
+    it("should reject non-string Responses API stream deltas", async () => {
+      const config: LLMProviderConfig = { ...baseConfig, apiType: "responses" };
+      fetchSpy.mockResolvedValueOnce(
+        createSSEResponse([
+          {
+            event: "response.output_text.delta",
+            data: '{"delta":{"text":"not a string"}}',
+          },
+        ]),
+      );
+
+      const router = new LLMRouter(config);
+
+      await expect(
+        router.complete([{ role: "user", content: "test" }], () => {}),
+      ).rejects.toThrow("Responses API stream error: delta must be a string");
+    });
   });
 
   describe("completeOpenAI - streaming", () => {
@@ -773,6 +791,22 @@ describe("LLMRouter", () => {
       await expect(
         router.complete([{ role: "user", content: "test" }], () => {}),
       ).rejects.toThrow("OpenAI stream error: malformed JSON payload");
+    });
+
+    it("should reject non-string OpenAI chat stream deltas", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        createSSEResponse([
+          {
+            data: '{"choices":[{"delta":{"content":{"text":"not a string"}}}]}',
+          },
+        ]),
+      );
+
+      const router = new LLMRouter(baseConfig);
+
+      await expect(
+        router.complete([{ role: "user", content: "test" }], () => {}),
+      ).rejects.toThrow("OpenAI stream error: delta.content must be a string");
     });
   });
 
@@ -867,6 +901,29 @@ describe("LLMRouter", () => {
       await expect(
         router.complete([{ role: "user", content: "test" }], () => {}),
       ).rejects.toThrow("Anthropic stream error: malformed JSON payload");
+    });
+
+    it("should reject non-string Anthropic stream deltas", async () => {
+      const config: LLMProviderConfig = {
+        name: "minimax",
+        baseUrl: "https://api.minimax.io/anthropic/v1",
+        apiKey: "test-minimax-key",
+        model: "MiniMax-M2.7",
+        maxTokens: 4096,
+      };
+      fetchSpy.mockResolvedValueOnce(
+        createSSEResponse([
+          {
+            data: '{"type":"content_block_delta","delta":{"text":{"value":"not a string"}}}',
+          },
+        ]),
+      );
+
+      const router = new LLMRouter(config);
+
+      await expect(
+        router.complete([{ role: "user", content: "test" }], () => {}),
+      ).rejects.toThrow("Anthropic stream error: delta.text must be a string");
     });
   });
 });
