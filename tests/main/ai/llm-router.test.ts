@@ -427,6 +427,22 @@ describe("LLMRouter", () => {
       ).rejects.toThrow("LLM 响应格式异常: 缺少 output 字段");
     });
 
+    it("should reject Responses API results without output text", async () => {
+      const config: LLMProviderConfig = { ...baseConfig, apiType: "responses" };
+      fetchSpy.mockResolvedValueOnce(
+        createJSONResponse({
+          status: "completed",
+          output: [],
+        }),
+      );
+
+      const router = new LLMRouter(config);
+
+      await expect(
+        router.complete([{ role: "user", content: "test" }]),
+      ).rejects.toThrow("LLM 响应格式异常: 缺少 output_text 字段");
+    });
+
     it("should reject incomplete Responses API results", async () => {
       const config: LLMProviderConfig = { ...baseConfig, apiType: "responses" };
       fetchSpy.mockResolvedValueOnce(

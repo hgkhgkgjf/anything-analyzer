@@ -43,16 +43,39 @@ type AnthropicContentBlock = AnthropicTextBlock | AnthropicToolUseBlock;
 
 const DEFAULT_TIMEOUT = 600000; // 10 minutes — LLM relay servers can be slow; user can cancel manually
 
-function extractResponsesOutputText(output: Array<{ type: string; content?: Array<{ type: string; text: string }> }>): string {
+interface ResponsesOutputItem {
+  type: string;
+  content?: Array<{ type: string; text?: unknown }>;
+}
+
+function extractResponsesOutputText(output: ResponsesOutputItem[]): string {
   let content = "";
   for (const item of output) {
     if (item.type === "message" && Array.isArray(item.content)) {
       content += item.content
-        .filter((c) => c.type === "output_text")
-        .map((c) => c.text)
+        .filter((c) => c.type === "output_text" && typeof c.text === "string")
+        .map((c) => c.text as string)
         .join("");
     }
   }
+  return content;
+}
+
+function readResponsesOutputText(data: {
+  output_text?: unknown;
+  output?: ResponsesOutputItem[];
+}): string {
+  const content =
+    typeof data.output_text === "string" && data.output_text.length > 0
+      ? data.output_text
+      : Array.isArray(data.output)
+        ? extractResponsesOutputText(data.output)
+        : "";
+
+  if (content.length === 0) {
+    throw new Error(`LLM 响应格式异常: 缺少 output_text 字段 — ${JSON.stringify(data).slice(0, 200)}`);
+  }
+
   return content;
 }
 
@@ -475,12 +498,10 @@ export class LLMRouter {
         status?: string;
         incomplete_details?: ResponsesIncompleteDetails;
         error?: { message?: string };
-        output: Array<{
-          type: string;
+        output: Array<ResponsesOutputItem & {
           id?: string;
           name?: string;
           arguments?: string;
-          content?: Array<{ type: string; text: string }>;
         }>;
         output_text?: string;
         usage?: { input_tokens: number; output_tokens: number };
@@ -530,12 +551,7 @@ export class LLMRouter {
       }
 
       // No function calls → extract text
-      let content = extractResponsesOutputText(data.output);
-
-      // Fallback: check output_text at top level
-      if (!content && typeof data.output_text === "string") {
-        content = data.output_text;
-      }
+      const content = readResponsesOutputText(data);
 
       if (onChunk && content) onChunk(content);
       return {
@@ -627,10 +643,7 @@ export class LLMRouter {
       incomplete_details?: ResponsesIncompleteDetails;
       error?: { message?: string };
       output_text?: string;
-      output?: Array<{
-        type: string;
-        content?: Array<{ type: string; text: string }>;
-      }>;
+      output?: ResponsesOutputItem[];
       usage?: { input_tokens: number; output_tokens: number };
     }>(response);
     if (data.status === "incomplete") {
@@ -642,7 +655,7 @@ export class LLMRouter {
     if (typeof data.output_text !== "string" && !Array.isArray(data.output)) {
       throw new Error(`LLM 响应格式异常: 缺少 output 字段 — ${JSON.stringify(data).slice(0, 200)}`);
     }
-    const content = data.output_text || (Array.isArray(data.output) ? extractResponsesOutputText(data.output) : "");
+    const content = readResponsesOutputText(data);
     return {
       content,
       promptTokens: data.usage?.input_tokens || 0,
